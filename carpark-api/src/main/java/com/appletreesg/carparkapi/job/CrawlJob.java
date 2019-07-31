@@ -1,22 +1,18 @@
 package com.appletreesg.carparkapi.job;
 
-import com.appletreesg.carparkapi.object.domain.CarparkData;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.appletreesg.carparkapi.object.domain.Carpark;
+import com.appletreesg.carparkapi.object.domain.CarparkAvailabity;
+import com.appletreesg.carparkapi.service.CarparkService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.ResponseEntity;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.client.RestTemplate;
 
-import javax.json.Json;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import java.io.IOException;
-import java.io.StringReader;
-import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -32,10 +28,20 @@ import java.util.Date;
 @Configuration
 @EnableScheduling
 public class CrawlJob {
+    @Value("${carpark.availability.url}")
+    private String carparkAvailabilityUrl;
+
     @Value("${carpark.data.url}")
     private String carparkDataUrl;
 
     private static SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+
+    private final CarparkService carparkService;
+
+    @Autowired
+    public CrawlJob(CarparkService carparkService) {
+        this.carparkService = carparkService;
+    }
 
     @Scheduled(cron = "0 0/2 7,8,9,12,13,17,18,19 * * *")
     public void peekHourCraw() {
@@ -47,16 +53,16 @@ public class CrawlJob {
         crawlData();
     }
 
-    @Scheduled(cron = "0/5 * * * * * ")
-    public void testCrawl() {
-        crawlData();
-    }
-
     private void crawlData() {
         RestTemplate restTemplate = new RestTemplate();
-        String url = carparkDataUrl + "?date_time=" + DATE_FORMAT.format(new Date());
-        log.info(url);
-        CarparkData response = restTemplate.getForObject(url, CarparkData.class);
+        CarparkAvailabity response = restTemplate.getForObject(carparkAvailabilityUrl, CarparkAvailabity.class);
         log.info(response.getItems().get(0).getCarpark_data().size()+"");
+    }
+
+    @EventListener
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+        RestTemplate restTemplate = new RestTemplate();
+        Carpark response = restTemplate.getForObject(carparkDataUrl, Carpark.class);
+        carparkService.loadCarpark(response.getResult().getRecords());
     }
 }

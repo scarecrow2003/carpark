@@ -13,7 +13,7 @@ import java.util.List;
  */
 
 @Getter
-public class CarparkData {
+public class CarparkAvailabity {
     private List<CarparkTimeData> items;
 
     @Getter
